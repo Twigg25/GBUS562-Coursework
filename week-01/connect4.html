@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connect Four</title>
+<style>
+  :root {
+    --bg: #f4f1ea;
+    --surface: #fffdf8;
+    --text: #1f2430;
+    --muted: #6b7080;
+    --line: #e4ddcf;
+    --board: #2f5bd3;
+    --board-edge: #2347ad;
+    --hole: #f4f1ea;
+    --hole-shadow: rgba(10, 20, 60, .35);
+    --hole-hl: #e6ebfa;
+    --p1: #e8453c;
+    --p1-hi: #ff7a6e;
+    --p1-edge: #b02c25;
+    --p2: #f6b81c;
+    --p2-hi: #ffd766;
+    --p2-edge: #c08600;
+    --accent: #2f5bd3;
+    --accent-text: #ffffff;
+    --gap: clamp(5px, 1.5vw, 11px);
+    --cell: clamp(34px, calc((100vw - 32px - 8 * var(--gap) - 16px) / 7), 64px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #13151b;
+      --surface: #1c1f27;
+      --text: #eef0f5;
+      --muted: #9aa0ae;
+      --line: #2b2f3a;
+      --board: #2d50c0;
+      --board-edge: #1f3a94;
+      --hole: #13151b;
+      --hole-shadow: rgba(0, 0, 0, .6);
+      --hole-hl: #222a40;
+      --accent: #5b7ff0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #13151b;
+    --surface: #1c1f27;
+    --text: #eef0f5;
+    --muted: #9aa0ae;
+    --line: #2b2f3a;
+    --board: #2d50c0;
+    --board-edge: #1f3a94;
+    --hole: #13151b;
+    --hole-shadow: rgba(0, 0, 0, .6);
+    --hole-hl: #222a40;
+    --accent: #5b7ff0;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 24px 16px 40px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .app {
+    width: 100%;
+    max-width: 560px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+  }
+
+  header { text-align: center; }
+  h1 {
+    margin: 0;
+    font-size: clamp(28px, 6vw, 38px);
+    letter-spacing: -0.02em;
+    font-weight: 800;
+  }
+  .sub { margin: 4px 0 0; color: var(--muted); font-size: 15px; }
+
+  /* Scoreboard */
+  .scores {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .score {
+    padding: 10px 8px;
+    text-align: center;
+    border-left: 1px solid var(--line);
+  }
+  .score:first-child { border-left: 0; }
+  .score .label {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    font-size: 13px; color: var(--muted);
+  }
+  .score .value {
+    font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums;
+    transition: transform .25s;
+  }
+  .score .value.bump { animation: bump .45s ease; }
+  @keyframes bump { 40% { transform: scale(1.35); } }
+
+  .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+  .dot.p1 { background: var(--p1); }
+  .dot.p2 { background: var(--p2); }
+  .dot.none { background: var(--muted); }
+
+  /* Status line */
+  .status {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 18px; font-weight: 650;
+    min-height: 28px;
+  }
+  .status .dot { width: 16px; height: 16px; transition: background .2s; }
+  .thinking::after {
+    content: "";
+    display: inline-block;
+    width: 1.2em;
+    text-align: left;
+    animation: dots 1.2s steps(4) infinite;
+  }
+  @keyframes dots {
+    0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; }
+  }
+
+  /* Board */
+  .play {
+    outline: none;
+    border-radius: 20px;
+    touch-action: manipulation;
+    user-select: none;
+  }
+  .play:focus-visible .board { box-shadow: 0 0 0 4px var(--bg), 0 0 0 7px var(--accent), 0 14px 30px rgba(0,0,0,.2); }
+  .preview, .board {
+    display: grid;
+    grid-template-columns: repeat(7, var(--cell));
+    gap: var(--gap);
+    padding: 0 var(--gap);
+  }
+  .preview { height: var(--cell); margin-bottom: calc(var(--gap) * 1.2); }
+  .pslot { position: relative; cursor: pointer; }
+  .board {
+    position: relative;
+    padding: var(--gap);
+    background: linear-gradient(180deg, var(--board), var(--board-edge));
+    border-radius: 18px;
+    box-shadow: inset 0 2px 0 rgba(255,255,255,.18), 0 14px 30px rgba(0,0,0,.2);
+  }
+  .cell {
+    position: relative;
+    width: var(--cell);
+    height: var(--cell);
+    border-radius: 50%;
+    background: var(--hole);
+    box-shadow: inset 0 4px 8px var(--hole-shadow);
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .cell.hl { background: var(--hole-hl); }
+
+  .piece {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    z-index: 2;
+    box-shadow: inset 0 -4px 0 rgba(0,0,0,.18), inset 0 0 0 3px rgba(0,0,0,.08);
+  }
+  .piece::after {
+    /* inner ring for a little depth */
+    content: "";
+    position: absolute;
+    inset: 18%;
+    border-radius: 50%;
+    box-shadow: inset 0 2px 3px rgba(0,0,0,.18), 0 1px 0 rgba(255,255,255,.25);
+  }
+  .piece.p1 { background: radial-gradient(circle at 35% 30%, var(--p1-hi), var(--p1) 55%, var(--p1-edge)); }
+  .piece.p2 { background: radial-gradient(circle at 35% 30%, var(--p2-hi), var(--p2) 55%, var(--p2-edge)); }
+  .piece.dropping {
+    z-index: 3;
+    animation-name: drop;
+    animation-fill-mode: both;
+  }
+  @keyframes drop {
+    0%   { transform: translateY(var(--from)); animation-timing-function: cubic-bezier(.45, 0, 1, 1); }
+    72%  { transform: translateY(0); animation-timing-function: cubic-bezier(0, 0, .3, 1); }
+    84%  { transform: translateY(-9%); animation-timing-function: cubic-bezier(.6, 0, 1, 1); }
+    100% { transform: translateY(0); }
+  }
+  .piece.last::before {
+    content: "";
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 16%; height: 16%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: rgba(255,255,255,.75);
+    z-index: 1;
+  }
+
+  .ghost {
+    opacity: .85;
+    animation: bob 1.4s ease-in-out infinite;
+  }
+  @keyframes bob { 50% { transform: translateY(-5px); } }
+
+  .board.finished .piece:not(.win) { opacity: .4; transition: opacity .4s; }
+  .piece.win { animation: win 1s ease-in-out infinite; z-index: 4; }
+  @keyframes win {
+    0%, 100% { transform: scale(1); box-shadow: inset 0 -4px 0 rgba(0,0,0,.18), 0 0 0 0 rgba(255,255,255,.0); }
+    50% { transform: scale(1.08); box-shadow: inset 0 -4px 0 rgba(0,0,0,.18), 0 0 0 5px rgba(255,255,255,.85); }
+  }
+  .board.shake { animation: shake .3s; }
+  @keyframes shake { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+  /* Controls */
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 12px 16px;
+    justify-content: center; align-items: flex-end;
+    width: 100%;
+  }
+  .group { display: flex; flex-direction: column; gap: 5px; align-items: center; }
+  .group[hidden] { display: none; }
+  .group-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .seg {
+    display: inline-flex;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 3px;
+  }
+  .seg button {
+    font: inherit; font-size: 14px;
+    border: 0; background: transparent; color: var(--muted);
+    padding: 7px 12px; border-radius: 7px; cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); font-weight: 600; }
+  .seg button:not([aria-pressed="true"]):hover { color: var(--text); }
+  .primary {
+    font: inherit; font-size: 15px; font-weight: 700;
+    border: 0; border-radius: 10px;
+    background: var(--text); color: var(--bg);
+    padding: 10px 20px; cursor: pointer;
+    transition: transform .1s;
+  }
+  .primary:active { transform: scale(.97); }
+  .primary.pulse { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent); } }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  .hint { margin: 0; font-size: 13px; color: var(--muted); text-align: center; line-height: 1.6; }
+  .link {
+    font: inherit; border: 0; background: none; padding: 0;
+    color: var(--muted); text-decoration: underline; cursor: pointer;
+  }
+  .link:hover { color: var(--text); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ghost, .piece.win, .primary.pulse, .thinking::after { animation: none; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <header>
+    <h1>Connect Four</h1>
+    <p class="sub" id="subtitle">Line up four in a row before the computer does.</p>
+  </header>
+
+  <section class="scores" aria-label="Score">
+    <div class="score"><div class="label"><span class="dot p1"></span><span id="labelP1">You</span></div><div class="value" id="scoreHuman">0</div></div>
+    <div class="score"><div class="label">Draws</div><div class="value" id="scoreDraw">0</div></div>
+    <div class="score"><div class="label"><span class="dot p2"></span><span id="labelP2">Computer</span></div><div class="value" id="scoreAI">0</div></div>
+  </section>
+
+  <div class="status" aria-live="polite">
+    <span class="dot p1" id="statusDot"></span><span id="statusText">Your turn</span>
+  </div>
+
+  <div class="play" id="play" tabindex="0" role="application"
+       aria-label="Game board. Use left and right arrows to choose a column and Enter to drop, or press 1 to 7.">
+    <div class="preview" id="preview"></div>
+    <div class="board" id="board"></div>
+  </div>
+
+  <div class="controls">
+    <div class="group">
+      <span class="group-label">Mode</span>
+      <div class="seg" id="modeSeg">
+        <button data-value="ai">vs Computer</button>
+        <button data-value="pvp">2 Players</button>
+      </div>
+    </div>
+    <div class="group" id="levelGroup">
+      <span class="group-label">Difficulty</span>
+      <div class="seg" id="levelSeg">
+        <button data-value="easy">Easy</button>
+        <button data-value="medium">Medium</button>
+        <button data-value="hard">Hard</button>
+      </div>
+    </div>
+    <div class="group" id="firstGroup">
+      <span class="group-label">First move</span>
+      <div class="seg" id="firstSeg">
+        <button data-value="human">You</button>
+        <button data-value="ai">Computer</button>
+      </div>
+    </div>
+    <button class="primary" id="newGame">New game</button>
+  </div>
+
+  <p class="hint">
+    Click a column, or use ← → and Enter (or keys 1–7).<br>
+    <button class="link" id="resetScore">Reset score</button>
+  </p>
+</main>
+
+<script>
+(() => {
+  // ---------- Game logic ----------
+  const ROWS = 6, COLS = 7;
+  const EMPTY = 0, HUMAN = 1, AI = 2;
+  const ORDER = [3, 2, 4, 1, 5, 0, 6];          // center-first move ordering
+  const DIRS = [[0, 1], [1, 0], [1, 1], [1, -1]];
+  const WIN = 1e6;
+  const LEVELS = {
+    easy:   { depth: 2, noise: 40 },
+    medium: { depth: 4, noise: 4 },
+    hard:   { depth: 6, noise: 0.5 },
+  };
+
+  // Every possible line of four on the board, used by the evaluator.
+  const WINDOWS = [];
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      for (const [dr, dc] of DIRS) {
+        const er = r + 3 * dr, ec = c + 3 * dc;
+        if (er < 0 || er >= ROWS || ec < 0 || ec >= COLS) continue;
+        WINDOWS.push([0, 1, 2, 3].map(i => [r + i * dr, c + i * dc]));
+      }
+
+  const emptyBoard = () => Array.from({ length: ROWS }, () => Array(COLS).fill(EMPTY));
+  const inBounds = (r, c) => r >= 0 && r < ROWS && c >= 0 && c < COLS;
+
+  function dropRow(b, c) {
+    for (let r = ROWS - 1; r >= 0; r--) if (b[r][c] === EMPTY) return r;
+    return -1;
+  }
+
+  const validMoves = b => ORDER.filter(c => b[0][c] === EMPTY);
+
+  // Returns the winning cells through (r, c) for player p, or null.
+  function lineAt(b, r, c, p) {
+    for (const [dr, dc] of DIRS) {
+      const cells = [[r, c]];
+      for (const s of [1, -1]) {
+        let rr = r + dr * s, cc = c + dc * s;
+        while (inBounds(rr, cc) && b[rr][cc] === p) {
+          cells.push([rr, cc]);
+          rr += dr * s; cc += dc * s;
+        }
+      }
+      if (cells.length >= 4) return cells;
+    }
+    return null;
+  }
+
+  // Positive scores favor the computer.
+  function evaluate(b) {
+    let s = 0;
+    for (let r = 0; r < ROWS; r++) {
+      if (b[r][3] === AI) s += 3;
+      else if (b[r][3] === HUMAN) s -= 3;
+    }
+    for (const w of WINDOWS) {
+      let a = 0, h = 0;
+      for (const [r, c] of w) {
+        const v = b[r][c];
+        if (v === AI) a++; else if (v === HUMAN) h++;
+      }
+      if (a && h) continue;
+      if (a === 3) s += 5;
+      else if (a === 2) s += 2;
+      else if (h === 3) s -= 6;
+      else if (h === 2) s -= 2;
+    }
+    return s;
+  }
+
+  // Minimax with alpha-beta pruning. Faster wins / slower losses score better.
+  function search(b, depth, alpha, beta, maximizing) {
+    const moves = validMoves(b);
+    if (!moves.length) return 0;
+    if (depth === 0) return evaluate(b);
+    const p = maximizing ? AI : HUMAN;
+    let best = maximizing ? -Infinity : Infinity;
+    for (const c of moves) {
+      const r = dropRow(b, c);
+      b[r][c] = p;
+      const s = lineAt(b, r, c, p)
+        ? (maximizing ? WIN + depth : -WIN - depth)
+        : search(b, depth - 1, alpha, beta, !maximizing);
+      b[r][c] = EMPTY;
+      if (maximizing) { if (s > best) best = s; if (best > alpha) alpha = best; }
+      else            { if (s < best) best = s; if (best < beta) beta = best; }
+      if (alpha >= beta) break;
+    }
+    return best;
+  }
+
+  function chooseMove(board, level) {
+    const { depth, noise } = LEVELS[level];
+    const b = board.map(row => row.slice());
+    let bestCol = null, bestScore = -Infinity;
+    for (const c of validMoves(b)) {
+      const r = dropRow(b, c);
+      b[r][c] = AI;
+      let s = lineAt(b, r, c, AI) ? WIN * 2 : search(b, depth - 1, -Infinity, Infinity, false);
+      b[r][c] = EMPTY;
+      s += Math.random() * noise;   // break ties, and loosen up the easier levels
+      if (s > bestScore) { bestScore = s; bestCol = c; }
+    }
+    return bestCol;
+  }
+
+  // ---------- Storage ----------
+  function load(key, fallback) {
+    try { const v = JSON.parse(localStorage.getItem(key)); return v ?? fallback; }
+    catch { return fallback; }
+  }
+  function save(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+  }
+
+  // ---------- UI ----------
+  const $ = id => document.getElementById(id);
+  const boardEl = $('board'), previewEl = $('preview'), playEl = $('play');
+  const statusText = $('statusText'), statusDot = $('statusDot');
+  const newGameBtn = $('newGame');
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const settings = Object.assign({ mode: 'ai', level: 'medium', first: 'human' }, load('c4-settings', {}));
+  if (!LEVELS[settings.level]) settings.level = 'medium';
+  if (settings.mode !== 'pvp') settings.mode = 'ai';
+
+  // Each mode keeps its own tally. In 2-player mode, "human" is Red and "ai" is Yellow.
+  const isPvp = () => settings.mode === 'pvp';
+  const scoreKey = () => isPvp() ? 'c4-score-pvp' : 'c4-score';
+  const loadScore = () => Object.assign({ human: 0, ai: 0, draw: 0 }, load(scoreKey(), {}));
+  let score = loadScore();
+  const colorName = p => p === HUMAN ? 'Red' : 'Yellow';
+
+  const cells = [];
+  const pslots = [];
+  for (let c = 0; c < COLS; c++) {
+    const s = document.createElement('div');
+    s.className = 'pslot';
+    s.dataset.c = c;
+    previewEl.append(s);
+    pslots.push(s);
+  }
+  for (let r = 0; r < ROWS; r++) {
+    cells.push([]);
+    for (let c = 0; c < COLS; c++) {
+      const el = document.createElement('div');
+      el.className = 'cell';
+      el.dataset.c = c;
+      boardEl.append(el);
+      cells[r].push(el);
+    }
+  }
+  const ghost = document.createElement('div');
+
+  let state, gen = 0, hoverCol = null;
+  let pvpStarter = HUMAN;   // 2-player games alternate who opens
+
+  const canHumanPlay = () => !state.over && !state.busy && (isPvp() || state.turn === HUMAN);
+
+  function newGame() {
+    gen++;
+    let turn;
+    if (isPvp()) {
+      turn = pvpStarter;
+      pvpStarter = pvpStarter === HUMAN ? AI : HUMAN;
+    } else {
+      turn = settings.first === 'human' ? HUMAN : AI;
+    }
+    state = {
+      board: emptyBoard(),
+      turn,
+      over: false,
+      busy: false,
+      moves: 0,
+    };
+    boardEl.querySelectorAll('.piece').forEach(p => p.remove());
+    boardEl.classList.remove('finished');
+    newGameBtn.classList.remove('pulse');
+    updateStatus();
+    updatePreview();
+    if (state.turn === AI && !isPvp()) aiTurn();
+  }
+
+  function updateStatus() {
+    statusText.classList.remove('thinking');
+    if (isPvp()) {
+      const w = state.winner;
+      statusText.textContent = !state.over ? `${colorName(state.turn)}'s turn`
+        : w ? `${colorName(w)} wins!` : "It's a draw";
+      statusDot.className = 'dot ' + (state.over && !w ? 'none' : `p${state.over ? w : state.turn}`);
+    } else if (state.over) {
+      const w = state.winner;
+      statusText.textContent = w === HUMAN ? 'You win!' : w === AI ? 'The computer wins' : "It's a draw";
+      statusDot.className = 'dot ' + (w === HUMAN ? 'p1' : w === AI ? 'p2' : 'none');
+    } else if (state.turn === HUMAN) {
+      statusText.textContent = 'Your turn';
+      statusDot.className = 'dot p1';
+    } else {
+      statusText.textContent = 'Computer is thinking';
+      statusText.classList.add('thinking');
+      statusDot.className = 'dot p2';
+    }
+  }
+
+  function updatePreview() {
+    for (const row of cells) for (const el of row) el.classList.remove('hl');
+    ghost.remove();
+    if (hoverCol === null || !canHumanPlay() || dropRow(state.board, hoverCol) < 0) return;
+    for (let r = 0; r < ROWS; r++) cells[r][hoverCol].classList.add('hl');
+    ghost.className = `piece p${state.turn} ghost`;
+    pslots[hoverCol].append(ghost);
+  }
+
+  function renderScore(bumpId) {
+    $('scoreHuman').textContent = score.human;
+    $('scoreAI').textContent = score.ai;
+    $('scoreDraw').textContent = score.draw;
+    if (bumpId) {
+      const el = $(bumpId);
+      el.classList.remove('bump');
+      void el.offsetWidth;
+      el.classList.add('bump');
+    }
+  }
+
+  function waitForDrop(el, ms) {
+    return new Promise(resolve => {
+      let done = false;
+      const finish = () => { if (!done) { done = true; resolve(); } };
+      el.addEventListener('animationend', finish, { once: true });
+      setTimeout(finish, ms + 100);
+    });
+  }
+
+  async function play(c, p) {
+    const myGen = gen;
+    const r = dropRow(state.board, c);
+    if (r < 0) return;
+    state.board[r][c] = p;
+    state.moves++;
+    state.busy = true;
+    updatePreview();
+
+    boardEl.querySelectorAll('.piece.last').forEach(el => el.classList.remove('last'));
+    const piece = document.createElement('div');
+    piece.className = `piece p${p} dropping`;
+    const ms = reduceMotion ? 1 : 260 + 55 * (r + 1);
+    piece.style.setProperty('--from', `calc(-${r + 1} * (var(--cell) + var(--gap)) - var(--gap) * 1.2)`);
+    piece.style.animationDuration = ms + 'ms';
+    cells[r][c].append(piece);
+
+    await waitForDrop(piece, ms);
+    if (myGen !== gen) return;
+    piece.classList.remove('dropping');
+    piece.classList.add('last');
+    state.busy = false;
+
+    const line = lineAt(state.board, r, c, p);
+    if (line) return finish(p, line);
+    if (state.moves === ROWS * COLS) return finish(EMPTY, null);
+
+    state.turn = p === HUMAN ? AI : HUMAN;
+    updateStatus();
+    updatePreview();
+    if (state.turn === AI && !isPvp()) aiTurn();
+  }
+
+  function aiTurn() {
+    const myGen = gen;
+    state.busy = true;
+    updateStatus();
+    // Let the status repaint before the search runs.
+    setTimeout(() => {
+      if (myGen !== gen || state.over) return;
+      const col = chooseMove(state.board, settings.level);
+      state.busy = false;
+      play(col, AI);
+    }, 450);
+  }
+
+  function finish(winner, line) {
+    state.over = true;
+    state.winner = winner;
+    if (line) {
+      boardEl.classList.add('finished');
+      for (const [r, c] of line) cells[r][c].querySelector('.piece').classList.add('win');
+    }
+    const key = winner === HUMAN ? 'human' : winner === AI ? 'ai' : 'draw';
+    score[key]++;
+    save(scoreKey(), score);
+    renderScore(winner === HUMAN ? 'scoreHuman' : winner === AI ? 'scoreAI' : 'scoreDraw');
+    newGameBtn.classList.add('pulse');
+    updateStatus();
+    updatePreview();
+  }
+
+  function humanDrop(c) {
+    if (!canHumanPlay()) return;
+    if (dropRow(state.board, c) < 0) {
+      boardEl.classList.remove('shake');
+      void boardEl.offsetWidth;
+      boardEl.classList.add('shake');
+      return;
+    }
+    play(c, state.turn);
+  }
+
+  // ---------- Input ----------
+  const colFromEvent = e => {
+    const t = e.target.closest('[data-c]');
+    return t ? Number(t.dataset.c) : null;
+  };
+
+  playEl.addEventListener('pointermove', e => {
+    const c = colFromEvent(e);
+    if (c !== null && c !== hoverCol) { hoverCol = c; updatePreview(); }
+  });
+  playEl.addEventListener('pointerleave', e => {
+    if (e.pointerType === 'mouse') { hoverCol = null; updatePreview(); }
+  });
+  playEl.addEventListener('click', e => {
+    const c = colFromEvent(e);
+    if (c !== null) { hoverCol = c; humanDrop(c); }
+  });
+  playEl.addEventListener('focus', () => {
+    if (hoverCol === null) { hoverCol = 3; updatePreview(); }
+  });
+  playEl.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      const d = e.key === 'ArrowLeft' ? -1 : 1;
+      hoverCol = Math.min(COLS - 1, Math.max(0, (hoverCol ?? 3) + d));
+      updatePreview();
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (hoverCol !== null) humanDrop(hoverCol);
+    } else if (/^[1-7]$/.test(e.key)) {
+      hoverCol = Number(e.key) - 1;
+      humanDrop(hoverCol);
+    }
+  });
+
+  function bindSeg(segId, key, onChange) {
+    const seg = $(segId);
+    const sync = () => seg.querySelectorAll('button').forEach(b =>
+      b.setAttribute('aria-pressed', String(b.dataset.value === settings[key])));
+    seg.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b || b.dataset.value === settings[key]) return;
+      settings[key] = b.dataset.value;
+      save('c4-settings', settings);
+      sync();
+      onChange?.();
+    });
+    sync();
+  }
+  function applyMode() {
+    const pvp = isPvp();
+    $('levelGroup').hidden = pvp;
+    $('firstGroup').hidden = pvp;
+    $('labelP1').textContent = pvp ? 'Red' : 'You';
+    $('labelP2').textContent = pvp ? 'Yellow' : 'Computer';
+    $('subtitle').textContent = pvp
+      ? 'Take turns — first to line up four wins.'
+      : 'Line up four in a row before the computer does.';
+    score = loadScore();
+    renderScore();
+  }
+  bindSeg('modeSeg', 'mode', () => {
+    pvpStarter = HUMAN;
+    applyMode();
+    newGame();
+  });
+  bindSeg('levelSeg', 'level');
+  // Switching who goes first restarts right away if the board is still empty.
+  bindSeg('firstSeg', 'first', () => { if (state.moves === 0 || state.over) newGame(); });
+
+  newGameBtn.addEventListener('click', newGame);
+  $('resetScore').addEventListener('click', () => {
+    score = { human: 0, ai: 0, draw: 0 };
+    save(scoreKey(), score);
+    renderScore();
+  });
+
+  applyMode();
+  newGame();
+})();
+</script>
+</body>
+</html>
