@@ -1,0 +1,24 @@
+# Secrets: never commit API keys
+.env
+.env.*
+!.env.example
+*.key
+API Key.txt
+*api*key*.txt
+*API*Key*.txt
+secrets.*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node
+node_modules/
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
