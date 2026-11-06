@@ -1,0 +1,4 @@
+anthropic
+beautifulsoup4
+pdfplumber
+rank-bm25

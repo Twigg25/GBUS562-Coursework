@@ -15,3 +15,7 @@ This repository holds coursework for GBUS 562, a course on AI language models. I
 ### Week 2
 
 - **[Prompt Lab](week-02/prompt-lab.html)**: a web app for testing prompts against Claude, built with Claude Code.
+
+### Week 3
+
+- **[Copperline RAG Tool](week-03/)**: a RAG tool that answers questions from Copperline Manufacturing's finance documents, built with Claude Code.
