@@ -8,10 +8,10 @@ Answers questions about Copperline Manufacturing's finance documents
 3. Send those sections to Claude, which answers from them and cites its sources.
 
 Usage (from the top of the repository):
-    .venv\\Scripts\\python.exe week-03\\rag.py                 # interactive: ask questions one after another
-    .venv\\Scripts\\python.exe week-03\\rag.py "question"      # answer one question
-    .venv\\Scripts\\python.exe week-03\\rag.py --chunks        # list every chunk (no API call)
-    .venv\\Scripts\\python.exe week-03\\rag.py --search "q"    # show which chunks a question retrieves (no API call)
+    .venv\\Scripts\\python.exe week-03\\ask.py                 # interactive: ask questions one after another
+    .venv\\Scripts\\python.exe week-03\\ask.py "question"      # answer one question
+    .venv\\Scripts\\python.exe week-03\\ask.py --chunks        # list every chunk (no API call)
+    .venv\\Scripts\\python.exe week-03\\ask.py --search "q"    # show which chunks a question retrieves (no API call)
 
 The API key is read from the ANTHROPIC_API_KEY environment variable or, if that
 is not set, from "API Key.txt" in a folder above the repository. It is never
